@@ -1615,15 +1615,15 @@ func (q *qemu) hotplugVFIODevice(ctx context.Context, device *config.VFIODev, op
 		}).Info("Start hot-plug VFIO device")
 
 		// In case HotplugVFIOOnRootBus is true, devices are hotplugged on the root bus
-		// for pc machine type instead of bridge. This is useful for devices that require
+		// for q35/virt machine type instead of bridge. This is useful for devices that require
 		// a large PCI BAR which is a currently a limitation with PCI bridges.
 		if q.state.HotplugVFIOOnRootBus {
 
 			// In case MachineType is q35, a PCIe device is hotplugged on a PCIe Root Port.
 			switch machineType {
-			case QemuQ35:
+			case QemuQ35, QemuVirt:
 				if device.IsPCIe && q.state.PCIeRootPort <= 0 {
-					q.Logger().WithField("dev-id", device.ID).Warn("VFIO device is a PCIe device. It's recommended to add the PCIe Root Port by setting the pcie_root_port parameter in the configuration for q35")
+					q.Logger().WithField("dev-id", device.ID).Warn("VFIO device is a PCIe device. It's recommended to add the PCIe Root Port by setting the pcie_root_port parameter in the configuration for q35/virt")
 					device.Bus = ""
 				}
 			default:
@@ -1632,7 +1632,13 @@ func (q *qemu) hotplugVFIODevice(ctx context.Context, device *config.VFIODev, op
 
 			switch device.Type {
 			case config.VFIODeviceNormalType:
-				err = q.qmpMonitorCh.qmp.ExecuteVFIODeviceAdd(q.qmpMonitorCh.ctx, devID, device.BDF, device.Bus, romFile)
+				pciDoaminBDF := strings.Split(device.SysfsDev, "/")[5]
+				q.Logger().WithFields(logrus.Fields{
+					"device-bus": device.Bus,
+					"device-ID":  devID,
+					"device-bdf": pciDoaminBDF,
+				}).Debug("Hotplug VFIO device on pcie root port")
+				err = q.qmpMonitorCh.qmp.ExecuteVFIODeviceAdd(q.qmpMonitorCh.ctx, devID, pciDoaminBDF, device.Bus, romFile)
 			case config.VFIODeviceMediatedType:
 				if utils.IsAPVFIOMediatedDevice(device.SysfsDev) {
 					err = q.qmpMonitorCh.qmp.ExecuteAPVFIOMediatedDeviceAdd(q.qmpMonitorCh.ctx, device.SysfsDev)

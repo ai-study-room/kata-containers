@@ -85,14 +85,29 @@ func (device *VFIODevice) Attach(ctx context.Context, devReceiver api.DeviceRece
 		if err != nil {
 			return err
 		}
-		vfio := &config.VFIODev{
-			ID:       utils.MakeNameID("vfio", device.DeviceInfo.ID+strconv.Itoa(i), maxDevIDSize),
-			Type:     vfioDeviceType,
-			BDF:      deviceBDF,
-			SysfsDev: deviceSysfsDev,
-			IsPCIe:   isPCIeDevice(deviceBDF),
-			Class:    getPCIDeviceProperty(deviceBDF, PCISysFsDevicesClass),
+
+		var vfio *config.VFIODev
+		if vfioDeviceType == config.VFIODeviceNormalType {
+			vfio = &config.VFIODev{
+				ID:       utils.MakeNameID("vfio", device.DeviceInfo.ID+strconv.Itoa(i), maxDevIDSize),
+				Type:     vfioDeviceType,
+				BDF:      deviceBDF,
+				SysfsDev: deviceSysfsDev,
+				// eg 0003:00:1c.0
+				IsPCIe: isPCIeDevice(deviceFile.Name()),
+				Class:  getPCIDeviceProperty(deviceFile.Name(), PCISysFsDevicesClass),
+			}
+		} else {
+			vfio = &config.VFIODev{
+				ID:       utils.MakeNameID("vfio", device.DeviceInfo.ID+strconv.Itoa(i), maxDevIDSize),
+				Type:     vfioDeviceType,
+				BDF:      deviceBDF,
+				SysfsDev: deviceSysfsDev,
+				IsPCIe:   isPCIeDevice(deviceBDF),
+				Class:    getPCIDeviceProperty(deviceBDF, PCISysFsDevicesClass),
+			}
 		}
+
 		device.VfioDevs = append(device.VfioDevs, vfio)
 		if vfio.IsPCIe {
 			vfio.Bus = fmt.Sprintf("%s%d", pcieRootPortPrefix, len(AllPCIeDevs))
